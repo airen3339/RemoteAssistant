@@ -1,0 +1,28 @@
+name: remote_assistant_mobile
+description: 远程助手手机端 - 发送指令到电脑端执行，管理OpenClaw和大模型
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  web_socket_channel: ^2.4.0
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+  uuid: ^4.2.1
+  qr_flutter: ^4.1.0
+  network_info_plus: ^5.0.3
+  connectivity_plus: ^5.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true

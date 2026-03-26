@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>RemoteAssistant - 远程助手</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <h2>?? 远程助手</h2>
+      </div>
+      <ul class="nav-list">
+        <li class="nav-item active" data-tab="dashboard">
+          <span class="nav-icon">?</span> 仪表盘
+        </li>
+        <li class="nav-item" data-tab="messages">
+          <span class="nav-icon">?</span> 消息中心
+        </li>
+        <li class="nav-item" data-tab="openclaw">
+          <span class="nav-icon">?</span> OpenClaw
+        </li>
+        <li class="nav-item" data-tab="llm">
+          <span class="nav-icon">?</span> 大模型配置
+        </li>
+        <li class="nav-item" data-tab="settings">
+          <span class="nav-icon">??</span> 设置
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="status-indicator" id="wsStatus">
+          <span class="status-dot offline"></span>
+          <span>WebSocket: 等待中</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="content">
+      <!-- Dashboard -->
+      <section class="tab-panel active" id="tab-dashboard">
+        <h1>仪表盘</h1>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card-header">? 连接状态</div>
+            <div class="card-body">
+              <div class="stat" id="connectedClients">0</div>
+              <div class="stat-label">已连接设备</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">? 本机地址</div>
+            <div class="card-body">
+              <div id="localIPs" class="ip-list">加载中...</div>
+              <div class="stat-label" id="wsPortDisplay">端口: 9600</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">? OpenClaw</div>
+            <div class="card-body">
+              <div class="stat" id="openclawStatus">未安装</div>
+              <button class="btn btn-primary" id="btnOpenclawQuick">一键安装</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">? 最近指令</div>
+            <div class="card-body">
+              <div id="recentCommands" class="recent-list">暂无指令</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">? MCP Server</div>
+            <div class="card-body">
+              <div class="stat" id="mcpToolCount">0</div>
+              <div class="stat-label">可用 Skills</div>
+              <div class="stat-label" id="mcpPortDisplay">端口: 9601</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">? HTTP API</div>
+            <div class="card-body">
+              <div class="stat" id="httpApiEndpointCount">0</div>
+              <div class="stat-label">REST 端点</div>
+              <div class="stat-label" id="httpApiPortDisplay">端口: 9602</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Messages -->
+      <section class="tab-panel" id="tab-messages">
+        <h1>消息中心</h1>
+        <div class="message-container">
+          <div class="message-list" id="messageList">
+            <div class="empty-state">等待手机端发送消息...</div>
+          </div>
+          <div class="message-input">
+            <input type="text" id="replyInput" placeholder="输入回复消息..." />
+            <button class="btn btn-primary" id="btnSendReply">发送</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- OpenClaw -->
+      <section class="tab-panel" id="tab-openclaw">
+        <h1>OpenClaw 管理</h1>
+        <div class="openclaw-panel">
+          <div class="card">
+            <div class="card-header">安装状态</div>
+            <div class="card-body">
+              <p>状态: <strong id="ocInstallStatus">检测中...</strong></p>
+              <div class="progress-bar" id="ocProgressBar" style="display:none">
+                <div class="progress-fill" id="ocProgressFill"></div>
+              </div>
+              <p id="ocProgressText" style="display:none"></p>
+              <div class="btn-group">
+                <button class="btn btn-primary" id="btnInstallOC">一键安装</button>
+                <button class="btn btn-success" id="btnStartOC" disabled>启动</button>
+                <button class="btn btn-danger" id="btnStopOC" disabled>停止</button>
+                <button class="btn btn-secondary" id="btnOpenOCUI" disabled>打开界面</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">接入方式</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>OpenClaw 连接模式</label>
+                <select id="ocConnectMode">
+                  <option value="mcp">MCP (SSE，推荐)</option>
+                  <option value="http">HTTP REST API</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>连接地址</label>
+                <div class="ip-list" id="ocConnectUrl" style="padding:8px 0">http://localhost:9601/sse</div>
+              </div>
+              <div class="form-group">
+                <label>配置说明</label>
+                <div class="log-output" id="ocConnectGuide" style="font-size:12px;max-height:100px">在 OpenClaw 设置中添加 MCP Server：
+类型: SSE
+地址: http://localhost:9601/sse
+
+连接后 OpenClaw 可自动发现并调用所有 Skills。</div>
+              </div>
+              <button class="btn btn-primary" id="btnSaveOcMode">保存接入方式</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">运行日志</div>
+            <div class="card-body">
+              <div class="log-output" id="ocLog">等待操作...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LLM Config -->
+      <section class="tab-panel" id="tab-llm">
+        <h1>大模型配置</h1>
+        <div class="llm-panel">
+          <div class="llm-toolbar">
+            <button class="btn btn-primary" id="btnAddLLM">+ 添加模型</button>
+            <button class="btn btn-secondary" id="btnLoadPresets">加载预设</button>
+          </div>
+          <div class="llm-list" id="llmList">
+            <div class="empty-state">暂未配置大模型，点击"添加模型"或"加载预设"开始</div>
+          </div>
+        </div>
+
+        <!-- LLM Config Modal -->
+        <div class="modal" id="llmModal" style="display:none">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2 id="llmModalTitle">添加大模型</h2>
+              <button class="modal-close" id="btnCloseLLMModal">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label>名称</label>
+                <input type="text" id="llmName" placeholder="例: OpenAI GPT-4" />
+              </div>
+              <div class="form-group">
+                <label>类型</label>
+                <select id="llmType">
+                  <option value="openai">OpenAI 兼容</option>
+                  <option value="anthropic">Anthropic Claude</option>
+                  <option value="google">Google Gemini</option>
+                  <option value="dashscope">通义千问 (DashScope)</option>
+                  <option value="ernie">文心一言 (ERNIE)</option>
+                  <option value="ollama">Ollama (本地)</option>
+                  <option value="lmstudio">LM Studio (本地)</option>
+                  <option value="llmstudio">LLM-Studio (本地)</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>API地址</label>
+                <input type="text" id="llmEndpoint" placeholder="https://api.openai.com/v1" />
+              </div>
+              <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="llmApiKey" placeholder="sk-..." />
+              </div>
+              <div class="form-group" id="llmUserIdGroup" style="display:none">
+                <label>User ID (LLM-Studio)</label>
+                <input type="text" id="llmUserId" placeholder="admin" />
+              </div>
+              <div class="form-group">
+                <label>模型名称</label>
+                <input type="text" id="llmModel" placeholder="gpt-4o" />
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" id="llmEnabled" checked /> 启用
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" id="btnTestLLM">测试连接</button>
+              <button class="btn btn-primary" id="btnSaveLLM">保存</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Presets Modal -->
+        <div class="modal" id="presetsModal" style="display:none">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>选择预设模型</h2>
+              <button class="modal-close" id="btnClosePresetsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div id="presetsList" class="presets-grid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="tab-panel" id="tab-settings">
+        <h1>设置</h1>
+        <div class="settings-panel">
+          <div class="card">
+            <div class="card-header">WebSocket 服务</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>监听端口</label>
+                <div class="input-group">
+                  <input type="number" id="settingsPort" value="9600" min="1024" max="65535" />
+                  <button class="btn btn-primary" id="btnSavePort">保存</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">MCP Server (Skills 服务)</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>MCP 端口</label>
+                <div class="input-group">
+                  <input type="number" id="settingsMcpPort" value="9601" min="1024" max="65535" />
+                  <button class="btn btn-primary" id="btnSaveMcpPort">保存</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>SSE 连接地址（供 OpenClaw 配置使用）</label>
+                <div class="ip-list" id="mcpSSEUrl" style="padding:8px 0">http://localhost:9601/sse</div>
+              </div>
+              <div class="form-group">
+                <label>已注册 Skills</label>
+                <div id="mcpToolsList" class="recent-list">加载中...</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">HTTP REST API 服务</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>HTTP API 端口</label>
+                <div class="input-group">
+                  <input type="number" id="settingsHttpApiPort" value="9602" min="1024" max="65535" />
+                  <button class="btn btn-primary" id="btnSaveHttpApiPort">保存</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Base URL</label>
+                <div class="ip-list" id="httpApiBaseUrl" style="padding:8px 0">http://localhost:9602/api</div>
+              </div>
+              <div class="form-group">
+                <label>使用示例</label>
+                <div class="log-output" id="httpApiExamples" style="font-size:12px;max-height:140px">GET  /api/health          - 健康检查
+GET  /api/tools            - 列出所有端点
+GET  /api/devices          - 已连接设备
+GET  /api/system/info      - 系统信息
+POST /api/llm/chat         - 调用大模型
+POST /api/tools/:name      - 通用 Skill 调用
+GET  /api/openclaw/status   - OpenClaw 状态</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">安全设置</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" id="settingsAuth" /> 要求连接认证
+                </label>
+              </div>
+              <div class="form-group">
+                <label>认证密码</label>
+                <input type="password" id="settingsPassword" placeholder="设置连接密码" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
